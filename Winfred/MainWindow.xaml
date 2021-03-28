@@ -14,7 +14,7 @@
         LostFocus="Winfred_LostFocus"
         Deactivated="Winfred_Deactivated"
         FocusManager.FocusedElement="{Binding ElementName=input_txt}">
-    <Grid>
+    <Grid Visibility="Hidden">
         <tb:TaskbarIcon x:Name="WinfredNotifyIcon"
                     ToolTipText="Winfred"
                     MenuActivation="LeftOrRightClick"
@@ -27,8 +27,20 @@
                 </ContextMenu>
             </tb:TaskbarIcon.ContextMenu>
         </tb:TaskbarIcon>
-        <TextBox x:Name="input_txt"
-                 FontSize="40" Foreground="White" Background="Black" Margin="12"
-                 BorderThickness="0"></TextBox>
+
+        <Grid Visibility="Hidden">
+            <Grid.RowDefinitions>
+                <RowDefinition Name="input_row" Height="*"></RowDefinition>
+                <RowDefinition Name="results_row" Height="0"></RowDefinition>
+            </Grid.RowDefinitions>
+
+            <TextBox x:Name="query_text"
+                     Grid.Row="0"
+                     FontSize="40" Foreground="White" Background="Black"
+                     Margin="12" BorderThickness="0" />
+
+            <Grid Name="results_grid" Grid.Row="1" Background="White" Margin="12,12,12,0">
+            </Grid>
+        </Grid>
     </Grid>
 </Window>

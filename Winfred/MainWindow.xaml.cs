@@ -32,11 +32,23 @@ namespace Winfred
         private event NeedBackspace BackspaceTrigger;
         private Dictionary<Combination, Action> m_ActionList = new Dictionary<Combination, Action>();
 
+        /// <summary>
+        /// Configuration file
+        /// </summary>
         private string m_ConfigFilePath = "Winfred.ini";
+        /// <summary>
+        /// Snippets configuration directory
+        /// </summary>
         private string m_SnippetsDir = "";
 
+        /// <summary>
+        /// String watching on user's input
+        /// </summary>
         private string m_CurrentString = "";
 
+        /// <summary>
+        /// Key word snippets map
+        /// </summary>
         private Dictionary<string, string> m_Snippets = new Dictionary<string, string>();
 
         public MainWindow()
@@ -45,6 +57,7 @@ namespace Winfred
             Winfred_SetStartupPosition();
             Load();
             Subscribe();
+            this.Visibility = Visibility.Hidden;
         }
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
@@ -97,62 +110,67 @@ namespace Winfred
         {
             if (Directory.Exists(m_SnippetsDir))
             {
-                try
+                var Dirs = Directory.EnumerateDirectories(m_SnippetsDir);
+                foreach (string currentDir in Dirs)
                 {
-                    var jsonFiles = Directory.EnumerateFiles(m_SnippetsDir, "*.json");
-
-                    foreach (string currentFile in jsonFiles)
+                    try
                     {
-                        if (File.Exists(currentFile))
-                        {
-                            using (StreamReader sr = File.OpenText(currentFile))
-                            {
-                                string snippetText = "";
-                                string snippetName = "";
+                        var jsonFiles = Directory.EnumerateFiles(currentDir, "*.json");
 
-                                string content = sr.ReadToEnd();
-                                JsonTextReader jsonReader = new JsonTextReader(new StringReader(content));
-                                while (jsonReader.Read())
+                        foreach (string currentFile in jsonFiles)
+                        {
+                            if (File.Exists(currentFile))
+                            {
+                                using (StreamReader sr = File.OpenText(currentFile))
                                 {
-                                    if (jsonReader.Value != null)
+                                    string snippetText = "";
+                                    string snippetName = "";
+
+                                    string content = sr.ReadToEnd();
+                                    JsonTextReader jsonReader = new JsonTextReader(new StringReader(content));
+                                    while (jsonReader.Read())
                                     {
-                                        if (jsonReader.TokenType is JsonToken.PropertyName
-                                            && jsonReader.Value.ToString() == "snippet")
+                                        if (jsonReader.Value != null)
                                         {
-                                            // Read the snippet text itself
-                                            jsonReader.Read();
-                                            if (jsonReader.Value != null
-                                                && jsonReader.TokenType is JsonToken.String)
+                                            if (jsonReader.TokenType is JsonToken.PropertyName
+                                                && jsonReader.Value.ToString() == "snippet")
                                             {
-                                                snippetText = jsonReader.Value.ToString();
+                                                // Read the snippet text itself
+                                                jsonReader.Read();
+                                                if (jsonReader.Value != null
+                                                    && jsonReader.TokenType is JsonToken.String)
+                                                {
+                                                    snippetText = jsonReader.Value.ToString();
+                                                }
                                             }
-                                        }
-                                        else
-                                        if(jsonReader.TokenType is JsonToken.PropertyName && jsonReader.Value.ToString() == "keyword")
-                                        {
-                                            // Read the snippet name
-                                            jsonReader.Read();
-                                            if (jsonReader.Value != null
-                                                && jsonReader.TokenType is JsonToken.String)
+                                            else
+                                            if (jsonReader.TokenType is JsonToken.PropertyName && jsonReader.Value.ToString() == "keyword")
                                             {
-                                                snippetName = jsonReader.Value.ToString();
+                                                // Read the snippet name
+                                                jsonReader.Read();
+                                                if (jsonReader.Value != null
+                                                    && jsonReader.TokenType is JsonToken.String)
+                                                {
+                                                    snippetName = jsonReader.Value.ToString();
+                                                }
                                             }
                                         }
                                     }
+                                    m_Snippets.Add(snippetName, snippetText);
                                 }
-                                m_Snippets.Add(snippetName, snippetText);
                             }
                         }
                     }
-                }
-                catch (Exception e)
-                {
-                    MessageBox.Show("ERROR Reading snippet files.");
+                    catch (Exception e)
+                    {
+                        MessageBox.Show("ERROR Reading snippet files.");
+                    }
                 }
             }
         }
         #endregion
 
+        #region 全局键鼠事件监听
         public void Subscribe()
         {
             m_GlobalHook = Hook.GlobalEvents();
@@ -172,7 +190,9 @@ namespace Winfred
             m_GlobalHook.KeyPress -= GlobalHookKeyPress;
             m_GlobalHook.Dispose();
         }
+        #endregion
 
+        #region snippet功能代码
         private void GlobalHookKeyPress(object sender, KeyPressEventArgs e)
         {
             if (e.KeyChar == '$')
@@ -186,6 +206,10 @@ namespace Winfred
                 if (IsSuccess && snippetText != null)
                 {
                     BackspaceTrigger.BeginInvoke(m_CurrentString, snippetText, null, null);
+                }
+                else if (m_CurrentString.Length >= 10)
+                {
+                    m_CurrentString = "";
                 }
             }
         }
@@ -215,7 +239,9 @@ namespace Winfred
             var sim = new InputSimulator();
             sim.Keyboard.ModifiedKeyStroke(VirtualKeyCode.LCONTROL, VirtualKeyCode.VK_V);
         }
+        #endregion
 
+        #region 界面相关事件处理
         private void Window_MouseDown(object sender, MouseButtonEventArgs e)
         {
             try
@@ -283,5 +309,6 @@ namespace Winfred
         {
             Load();
         }
+        #endregion
     }
 }
