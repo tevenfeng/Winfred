@@ -13,5 +13,9 @@ namespace Winfred
     /// </summary>
     public partial class App : Application
     {
+        private void Application_Deactivated(object sender, EventArgs e)
+        {
+            this.MainWindow.Visibility = Visibility.Hidden;
+        }
     }
 }

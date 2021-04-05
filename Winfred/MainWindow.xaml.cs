@@ -8,8 +8,15 @@ using Newtonsoft.Json;
 using WindowsHook;
 using WindowsInput;
 using WindowsInput.Native;
-using Hardcodet.Wpf.TaskbarNotification;
 using KeyPressEventArgs = WindowsHook.KeyPressEventArgs;
+using Winfred.ViewModel;
+using System.Windows.Controls;
+using System.Windows.Media.Imaging;
+using System.Windows.Documents;
+using System.Runtime.InteropServices;
+using WK.Libraries.SharpClipboardNS;
+using System.Drawing.Imaging;
+//using static WK.Libraries.SharpClipboardNS.SharpClipboard;
 
 namespace Winfred
 {
@@ -23,6 +30,8 @@ namespace Winfred
         /// </summary>
         private IKeyboardMouseEvents m_GlobalHook;
 
+        private SharpClipboard sharpClipboard = new SharpClipboard();
+
         /// <summary>
         /// Delegation for backspacing and replacing texts
         /// </summary>
@@ -30,6 +39,10 @@ namespace Winfred
         /// <param name="target">Snippet content to insert</param>
         private delegate void NeedBackspace(string source, string target);
         private event NeedBackspace BackspaceTrigger;
+
+        /// <summary>
+        /// Key combinations and actions list on watching
+        /// </summary>
         private Dictionary<Combination, Action> m_ActionList = new Dictionary<Combination, Action>();
 
         /// <summary>
@@ -46,10 +59,22 @@ namespace Winfred
         /// </summary>
         private string m_CurrentString = "";
 
+        private string m_TopTextInClipboard = "";
+
+        private BitmapSource m_TopBitmapSource;
+
+        private static bool bNeedWatchOnClipboard = true;
+
         /// <summary>
         /// Key word snippets map
         /// </summary>
-        private Dictionary<string, string> m_Snippets = new Dictionary<string, string>();
+        private ResultsViewModel m_SnippetsViewModel = new ResultsViewModel();
+
+        private ResultsViewModel m_ClipboardResults = new ResultsViewModel();
+
+        private Dictionary<int, BitmapSource> m_ClipboardImages = new Dictionary<int, BitmapSource>();
+
+        //private ObservableCollection<ResultViewModel> m_Results = new ObservableCollection<ResultViewModel>();
 
         public MainWindow()
         {
@@ -58,6 +83,11 @@ namespace Winfred
             Load();
             Subscribe();
             this.Visibility = Visibility.Hidden;
+
+            sharpClipboard.ClipboardChanged += SharpClipboard_ClipboardChanged;
+
+            this.m_ClipboardResults.PropertyChanged += M_ClipboardResults_PropertyChanged;
+            this.ResultsListBox.SelectionChanged += ResultsListBox_SelectionChanged;
         }
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
@@ -69,7 +99,10 @@ namespace Winfred
         #region 配置加载相关函数
         private void Load()
         {
-            m_Snippets.Clear();
+            m_ClipboardImages.Clear();
+            bNeedWatchOnClipboard = true;
+            m_ClipboardResults.clear();
+            m_SnippetsViewModel.clear();
             LoadConfiguration();
             LoadSnippets();
         }
@@ -156,14 +189,17 @@ namespace Winfred
                                             }
                                         }
                                     }
-                                    m_Snippets.Add(snippetName, snippetText);
+                                    m_SnippetsViewModel.Results.Add(new ResultViewModel(snippetName,
+                                                                                        snippetText,
+                                                                                        ResultTypeEnum.Text,
+                                                                                        snippetName.GetHashCode()));
                                 }
                             }
                         }
                     }
                     catch (Exception e)
                     {
-                        MessageBox.Show("ERROR Reading snippet files.");
+                        MessageBox.Show("ERROR Reading snippet files.\n{0}", e.Message.ToString());
                     }
                 }
             }
@@ -177,67 +213,20 @@ namespace Winfred
 
             m_GlobalHook.KeyPress += GlobalHookKeyPress;
 
-            Combination combination = Combination.TriggeredBy(Keys.Space).With(Keys.Alt).With(Keys.LControlKey);
-            Action actionShowWindow = Winfred_Show;
-            m_ActionList.Add(combination, actionShowWindow);
+            // Display clipboard contents
+            Combination clipboardCombination = Combination.TriggeredBy(Keys.Space).With(Keys.Alt).With(Keys.LControlKey);
+            Action actionClipboard = DisplayClipboardContents;
+            m_ActionList.Add(clipboardCombination, actionClipboard);
+
             Hook.GlobalEvents().OnCombination(m_ActionList);
 
             this.BackspaceTrigger += new NeedBackspace(ReplaceSourceByTarget);
         }
-        
+
         public void Unsubscribe()
         {
             m_GlobalHook.KeyPress -= GlobalHookKeyPress;
             m_GlobalHook.Dispose();
-        }
-        #endregion
-
-        #region snippet功能代码
-        private void GlobalHookKeyPress(object sender, KeyPressEventArgs e)
-        {
-            if (e.KeyChar == '$')
-            {
-                m_CurrentString = "$";
-            }
-            else
-            {
-                m_CurrentString += e.KeyChar.ToString();
-                bool IsSuccess = m_Snippets.TryGetValue(m_CurrentString, out string snippetText);
-                if (IsSuccess && snippetText != null)
-                {
-                    BackspaceTrigger.BeginInvoke(m_CurrentString, snippetText, null, null);
-                }
-                else if (m_CurrentString.Length >= 10)
-                {
-                    m_CurrentString = "";
-                }
-            }
-        }
-
-        private void ReplaceSourceByTarget(string source, string target)
-        {
-            System.Threading.Thread.Sleep(100);
-            int n = source.Length;
-            for (int i = 0; i < n; i++)
-            {
-                var sim = new InputSimulator();
-                sim.Keyboard.KeyPress(VirtualKeyCode.BACK);
-            }
-            SetText2Clipboard(target);
-        }
-
-        [STAThread]
-        public static void SetText2Clipboard(string text)
-        {
-            Thread th = new Thread(new ThreadStart(delegate ()
-            {
-                Clipboard.SetText(text);
-            }));
-            th.TrySetApartmentState(ApartmentState.STA);
-            th.Start();
-            th.Join();
-            var sim = new InputSimulator();
-            sim.Keyboard.ModifiedKeyStroke(VirtualKeyCode.LCONTROL, VirtualKeyCode.VK_V);
         }
         #endregion
 
@@ -265,20 +254,13 @@ namespace Winfred
             }
         }
 
-        private void Winfred_Deactivated(object sender, EventArgs e)
-        {
-            Winfred_Hide();
-        }
-
-        private void Winfred_LostFocus(object sender, RoutedEventArgs e)
-        {
-            Winfred_Hide();
-        }
-
         private void Winfred_Show()
         {
             this.Visibility = Visibility.Visible;
             this.Activate();
+            this.query_text.Clear();
+            this.query_text.Focus();
+            this.ResultsListBox.SelectedIndex = 0;
         }
 
         private void Winfred_Hide()
@@ -308,6 +290,198 @@ namespace Winfred
         private void tray_menu_reload_Click(object sender, RoutedEventArgs e)
         {
             Load();
+        }
+        #endregion
+
+        #region snippet功能代码
+        private void GlobalHookKeyPress(object sender, KeyPressEventArgs e)
+        {
+            if (e.KeyChar == '$')
+            {
+                m_CurrentString = "$";
+            }
+            else if (e.KeyChar == '\b')
+            {
+                if (m_CurrentString.Length > 0)
+                {
+                    m_CurrentString = m_CurrentString.Remove(m_CurrentString.Length - 1, 1);
+                }
+            }
+            else
+            {
+                m_CurrentString += e.KeyChar.ToString();
+                bool IsSuccess = m_SnippetsViewModel.FindByResultName(m_CurrentString, out ResultViewModel targetSnippet);
+                if (IsSuccess)
+                {
+                    BackspaceTrigger.BeginInvoke(m_CurrentString, targetSnippet.ResultPreview, null, null);
+                }
+                else if (m_CurrentString.Length >= 10)
+                {
+                    m_CurrentString = "";
+                }
+            }
+        }
+
+        private void ReplaceSourceByTarget(string source, string target)
+        {
+            bNeedWatchOnClipboard = false;
+            Thread.Sleep(10);
+
+            int n = source.Length;
+            var sim = new InputSimulator();
+            for (int i = 0; i < n; i++)
+            {
+                sim.Keyboard.KeyPress(VirtualKeyCode.BACK);
+            }
+            SetText2Clipboard(target);
+
+            sim.Keyboard.ModifiedKeyStroke(VirtualKeyCode.LCONTROL, VirtualKeyCode.VK_V);
+
+            bNeedWatchOnClipboard = true;
+        }
+
+        [STAThread]
+        public static void SetText2Clipboard(string text)
+        {
+            Thread th = new Thread(new ThreadStart(delegate ()
+            {
+                DataObject dataObject = new DataObject(DataFormats.Text, text);
+                Clipboard.SetDataObject(dataObject, true);
+            }));
+            th.TrySetApartmentState(ApartmentState.STA);
+            th.Start();
+            th.Join();
+        }
+        #endregion
+
+        #region clipboard功能代码
+        private void DisplayClipboardContents()
+        {
+            this.Winfred_Show();
+        }
+
+        private void SharpClipboard_ClipboardChanged(object sender, SharpClipboard.ClipboardChangedEventArgs e)
+        {
+            if (!bNeedWatchOnClipboard)
+            {
+                return;
+            }
+
+            if (e.ContentType == SharpClipboard.ContentTypes.Text)
+            {
+                string tempString = sharpClipboard.ClipboardText;
+                if (tempString != m_TopTextInClipboard)
+                {
+                    if (m_ClipboardResults.FindByResultName(tempString, out ResultViewModel temp1))
+                    {
+                        return;
+                    }
+
+                    this.m_TopTextInClipboard = tempString;
+
+                    m_ClipboardResults.Results.Insert(0,
+                                                new ResultViewModel(this.m_TopTextInClipboard,
+                                                                    this.m_TopTextInClipboard,
+                                                                    ResultTypeEnum.Text,
+                                                                    this.m_TopTextInClipboard.GetHashCode()));
+
+                    return;
+                }
+            }
+            else if (e.ContentType == SharpClipboard.ContentTypes.Image)
+            {
+                BitmapSource tempBitMap = Clipboard.GetImage();
+                if (tempBitMap != null)
+                {
+                    m_TopBitmapSource = tempBitMap;
+                    string name = System.String.Format("Image {0}x{1}", m_TopBitmapSource.PixelWidth, m_TopBitmapSource.PixelHeight);
+                    m_ClipboardResults.Results.Insert(0,
+                            new ResultViewModel(name,
+                                                this.m_TopBitmapSource.GetHashCode().ToString(),
+                                                ResultTypeEnum.Image,
+                                                this.m_TopBitmapSource.GetHashCode()));
+                    m_ClipboardImages.Add(this.m_TopBitmapSource.GetHashCode(), m_TopBitmapSource);
+                }
+            }
+        }
+
+        private void M_ClipboardResults_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            this.ResultsListBox.DataContext = this.m_ClipboardResults;
+        }
+
+        private void ResultsListBox_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        {
+            this.PreviewTextBlock.Document.Blocks.Clear();
+
+            try
+            {
+                ResultViewModel target = this.m_ClipboardResults.Results[this.ResultsListBox.SelectedIndex];
+                if (target.MainTypeEnum == ResultTypeEnum.Text)
+                {
+                    this.PreviewTextBlock.AppendText(target.ResultPreview);
+                }
+                else if (target.MainTypeEnum == ResultTypeEnum.Image)
+                {
+                    if (m_ClipboardImages.ContainsKey(target.HashCode))
+                    {
+                        Image image = new Image
+                        {
+                            Source = m_ClipboardImages[target.HashCode]
+                        };
+
+                        Paragraph paragraph = new Paragraph();
+                        paragraph.Inlines.Add(image);
+                        this.PreviewTextBlock.Document.Blocks.Add(paragraph);
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                Console.WriteLine(exception.Message.ToString());
+            }
+        }
+
+        private void ResultsListBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter)
+            {
+                try
+                {
+                    bNeedWatchOnClipboard = false;
+                    Thread.Sleep(100);
+
+                    ResultViewModel target = this.m_ClipboardResults.Results[this.ResultsListBox.SelectedIndex];
+
+                    if (target.MainTypeEnum == ResultTypeEnum.Text)
+                    {
+                        SetText2Clipboard(target.ResultPreview);
+                    }
+                    else if (target.MainTypeEnum == ResultTypeEnum.Image)
+                    {
+                        if (m_ClipboardImages.ContainsKey(target.HashCode))
+                        {
+                            DataObject dataObject = new DataObject(DataFormats.Bitmap, m_ClipboardImages[target.HashCode]);
+                            Clipboard.SetDataObject(dataObject, true);
+                        }
+                        else
+                        {
+                            Clipboard.Clear();
+                        }
+                    }
+
+                    Application.Current.MainWindow.Hide();
+
+                    var sim = new InputSimulator();
+                    sim.Keyboard.ModifiedKeyStroke(VirtualKeyCode.LCONTROL, VirtualKeyCode.VK_V);
+
+                    bNeedWatchOnClipboard = true;
+                }
+                catch (Exception exception)
+                {
+                    Console.WriteLine(exception.Message.ToString());
+                }
+            }
         }
         #endregion
     }
