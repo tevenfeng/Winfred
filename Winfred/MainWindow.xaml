@@ -12,7 +12,7 @@
         WindowStartupLocation="Manual"
         Visibility="Visible" WindowStyle="None" AllowsTransparency="True" Background="Black" Icon="Winfred.ico"
         MouseDown="Window_MouseDown"
-        KeyDown="Winfred_KeyDown"
+        PreviewKeyDown="Winfred_KeyDown"
         >
     <Grid>
         <tb:TaskbarIcon x:Name="WinfredNotifyIcon"
@@ -32,7 +32,7 @@
             <TextBox x:Name="query_text"
                      Grid.Row="0"
                      FontSize="40" Height="54" Foreground="White" Background="Black"
-                     Margin="12" BorderThickness="0" />
+                     Margin="12" BorderThickness="0"/>
 
             <Grid>
                 <Grid.ColumnDefinitions>

@@ -30,6 +30,9 @@ namespace Winfred
         /// </summary>
         private IKeyboardMouseEvents m_GlobalHook;
 
+        /// <summary>
+        /// Clipboard watcher
+        /// </summary>
         private SharpClipboard sharpClipboard = new SharpClipboard();
 
         /// <summary>
@@ -62,8 +65,6 @@ namespace Winfred
         private string m_TopTextInClipboard = "";
 
         private BitmapSource m_TopBitmapSource;
-
-        private static bool bNeedWatchOnClipboard = true;
 
         /// <summary>
         /// Key word snippets map
@@ -100,7 +101,6 @@ namespace Winfred
         private void Load()
         {
             m_ClipboardImages.Clear();
-            bNeedWatchOnClipboard = true;
             m_ClipboardResults.clear();
             m_SnippetsViewModel.clear();
             LoadConfiguration();
@@ -251,6 +251,29 @@ namespace Winfred
             if (e.Key == Key.Escape)
             {
                 Winfred_Hide();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Down)
+            {
+                this.ResultsListBox.SelectedIndex++;
+                if (this.ResultsListBox.SelectedIndex >= this.ResultsListBox.Items.Count)
+                {
+                    this.ResultsListBox.SelectedIndex = 0;
+                }
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Up)
+            {
+
+                if (this.ResultsListBox.SelectedIndex == 0)
+                {
+                    this.ResultsListBox.SelectedIndex = this.ResultsListBox.Items.Count;
+                }
+                else
+                {
+                    this.ResultsListBox.SelectedIndex--;
+                }
+                e.Handled = true;
             }
         }
 
@@ -280,16 +303,19 @@ namespace Winfred
         private void tray_menu_quit_Click(object sender, RoutedEventArgs e)
         {
             Application.Current.Shutdown();
+            e.Handled = true;
         }
 
         private void tray_menu_display_Click(object sender, RoutedEventArgs e)
         {
             Winfred_Show();
+            e.Handled = true;
         }
 
         private void tray_menu_reload_Click(object sender, RoutedEventArgs e)
         {
             Load();
+            e.Handled = true;
         }
         #endregion
 
@@ -313,7 +339,13 @@ namespace Winfred
                 bool IsSuccess = m_SnippetsViewModel.FindByResultName(m_CurrentString, out ResultViewModel targetSnippet);
                 if (IsSuccess)
                 {
-                    BackspaceTrigger.BeginInvoke(m_CurrentString, targetSnippet.ResultPreview, null, null);
+                    this.sharpClipboard.ClipboardChanged -= SharpClipboard_ClipboardChanged;
+
+                    IAsyncResult result = BackspaceTrigger.BeginInvoke(m_CurrentString, targetSnippet.ResultPreview, null, null);
+                    BackspaceTrigger.EndInvoke(result);
+
+
+                    this.sharpClipboard.ClipboardChanged += SharpClipboard_ClipboardChanged;
                 }
                 else if (m_CurrentString.Length >= 10)
                 {
@@ -322,11 +354,13 @@ namespace Winfred
             }
         }
 
+        private void BackspaceTriggerCallBack(IAsyncResult asyncResult)
+        {
+            this.sharpClipboard.ClipboardChanged += SharpClipboard_ClipboardChanged;
+        }
+
         private void ReplaceSourceByTarget(string source, string target)
         {
-            bNeedWatchOnClipboard = false;
-            Thread.Sleep(10);
-
             int n = source.Length;
             var sim = new InputSimulator();
             for (int i = 0; i < n; i++)
@@ -336,8 +370,6 @@ namespace Winfred
             SetText2Clipboard(target);
 
             sim.Keyboard.ModifiedKeyStroke(VirtualKeyCode.LCONTROL, VirtualKeyCode.VK_V);
-
-            bNeedWatchOnClipboard = true;
         }
 
         [STAThread]
@@ -362,11 +394,6 @@ namespace Winfred
 
         private void SharpClipboard_ClipboardChanged(object sender, SharpClipboard.ClipboardChangedEventArgs e)
         {
-            if (!bNeedWatchOnClipboard)
-            {
-                return;
-            }
-
             if (e.ContentType == SharpClipboard.ContentTypes.Text)
             {
                 string tempString = sharpClipboard.ClipboardText;
@@ -440,6 +467,8 @@ namespace Winfred
             {
                 Console.WriteLine(exception.Message.ToString());
             }
+
+            e.Handled = true;
         }
 
         private void ResultsListBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
@@ -448,8 +477,7 @@ namespace Winfred
             {
                 try
                 {
-                    bNeedWatchOnClipboard = false;
-                    Thread.Sleep(100);
+                    this.sharpClipboard.ClipboardChanged -= SharpClipboard_ClipboardChanged;
 
                     ResultViewModel target = this.m_ClipboardResults.Results[this.ResultsListBox.SelectedIndex];
 
@@ -475,12 +503,14 @@ namespace Winfred
                     var sim = new InputSimulator();
                     sim.Keyboard.ModifiedKeyStroke(VirtualKeyCode.LCONTROL, VirtualKeyCode.VK_V);
 
-                    bNeedWatchOnClipboard = true;
+                    this.sharpClipboard.ClipboardChanged += SharpClipboard_ClipboardChanged;
                 }
                 catch (Exception exception)
                 {
                     Console.WriteLine(exception.Message.ToString());
                 }
+
+                e.Handled = true;
             }
         }
         #endregion
