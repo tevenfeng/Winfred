@@ -40,7 +40,7 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
                 <ContentControl Grid.Column="0">
-                    <local:ResultsListBox x:Name="ResultsListBox" KeyDown="ResultsListBox_KeyDown">
+                    <local:ResultsListBox x:Name="ResultsListBox">
                     </local:ResultsListBox>
                 </ContentControl>
                 <RichTextBox x:Name="PreviewTextBlock" Grid.Column="1"

@@ -20,28 +20,28 @@ namespace Winfred.ViewModel
         public string ResultName
         {
             get { return _ResultName; }
-            set { _ResultName = value; FirePropertyChanged("ResultName"); }
+            set { _ResultName = value; FirePropertyChanged(nameof(ResultName)); }
         }
 
         private string _ResultPreview;
         public string ResultPreview
         {
             get { return _ResultPreview; }
-            set { _ResultPreview = value; FirePropertyChanged("ResultPreview"); }
+            set { _ResultPreview = value; FirePropertyChanged(nameof(ResultPreview)); }
         }
 
         private ResultTypeEnum _MainTypeEnum;
         public ResultTypeEnum MainTypeEnum
         {
             get { return _MainTypeEnum; }
-            set { _MainTypeEnum = value; FirePropertyChanged("MainTypeEnum"); }
+            set { _MainTypeEnum = value; FirePropertyChanged(nameof(MainTypeEnum)); }
         }
 
         private int _HashCode;
         public int HashCode
         {
             get { return _HashCode; }
-            set { _HashCode = value; FirePropertyChanged("HashCode"); }
+            set { _HashCode = value; FirePropertyChanged(nameof(HashCode)); }
         }
 
         public ResultViewModel()

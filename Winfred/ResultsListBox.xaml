@@ -10,6 +10,8 @@
       MaxHeight="384" MaxWidth="309"
       Background="Black" Foreground="White" BorderThickness="0"
       ItemsSource="{Binding Results}"
+      SelectedIndex="{Binding SelectedIndex, Mode=TwoWay}"
+      SelectedItem="{Binding SelectedResultViewModel, Mode=OneWayToSource}"
       SelectionMode="Single" ScrollViewer.VerticalScrollBarVisibility="Hidden">
 
     <ListBox.DataContext>

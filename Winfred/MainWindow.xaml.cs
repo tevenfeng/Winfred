@@ -16,7 +16,6 @@ using System.Windows.Documents;
 using System.Runtime.InteropServices;
 using WK.Libraries.SharpClipboardNS;
 using System.Drawing.Imaging;
-//using static WK.Libraries.SharpClipboardNS.SharpClipboard;
 
 namespace Winfred
 {
@@ -71,7 +70,7 @@ namespace Winfred
         /// </summary>
         private ResultsViewModel m_SnippetsViewModel = new ResultsViewModel();
 
-        private ResultsViewModel m_ClipboardResults = new ResultsViewModel();
+        private readonly ResultsViewModel m_ClipboardResults = new ResultsViewModel();
 
         private Dictionary<int, BitmapSource> m_ClipboardImages = new Dictionary<int, BitmapSource>();
 
@@ -94,6 +93,7 @@ namespace Winfred
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
             Unsubscribe();
+            WinfredNotifyIcon.Visibility = Visibility.Collapsed;
             WinfredNotifyIcon.Dispose();
         }
 
@@ -101,8 +101,8 @@ namespace Winfred
         private void Load()
         {
             m_ClipboardImages.Clear();
-            m_ClipboardResults.clear();
-            m_SnippetsViewModel.clear();
+            m_ClipboardResults.Clear();
+            m_SnippetsViewModel.Clear();
             LoadConfiguration();
             LoadSnippets();
         }
@@ -255,33 +255,60 @@ namespace Winfred
             }
             else if (e.Key == Key.Down)
             {
-                this.ResultsListBox.SelectedIndex++;
-                if (this.ResultsListBox.SelectedIndex >= this.ResultsListBox.Items.Count)
-                {
-                    this.ResultsListBox.SelectedIndex = 0;
-                }
+                this.m_ClipboardResults.SelectNext();
                 e.Handled = true;
             }
             else if (e.Key == Key.Up)
             {
+                this.m_ClipboardResults.SelectPrevious();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Enter)
+            {
+                try
+                {
+                    this.sharpClipboard.ClipboardChanged -= SharpClipboard_ClipboardChanged;
 
-                if (this.ResultsListBox.SelectedIndex == 0)
-                {
-                    this.ResultsListBox.SelectedIndex = this.ResultsListBox.Items.Count;
+                    ResultViewModel target = this.m_ClipboardResults.SelectedResultViewModel;
+
+                    if (target.MainTypeEnum == ResultTypeEnum.Text)
+                    {
+                        SetText2Clipboard(target.ResultPreview);
+                    }
+                    else if (target.MainTypeEnum == ResultTypeEnum.Image)
+                    {
+                        if (m_ClipboardImages.ContainsKey(target.HashCode))
+                        {
+                            DataObject dataObject = new DataObject(DataFormats.Bitmap, m_ClipboardImages[target.HashCode]);
+                            Clipboard.SetDataObject(dataObject, true);
+                        }
+                        else
+                        {
+                            Clipboard.Clear();
+                        }
+                    }
+
+                    Application.Current.MainWindow.Hide();
+
+                    var sim = new InputSimulator();
+                    sim.Keyboard.ModifiedKeyStroke(VirtualKeyCode.LCONTROL, VirtualKeyCode.VK_V);
+
+                    this.sharpClipboard.ClipboardChanged += SharpClipboard_ClipboardChanged;
                 }
-                else
+                catch (Exception exception)
                 {
-                    this.ResultsListBox.SelectedIndex--;
+                    Console.WriteLine(exception.Message.ToString());
                 }
+
                 e.Handled = true;
             }
         }
 
         private void Winfred_Show()
         {
-            this.Visibility = Visibility.Visible;
             this.Activate();
             this.query_text.Clear();
+            this.Visibility = Visibility.Visible;
             this.query_text.Focus();
             this.ResultsListBox.SelectedIndex = 0;
         }
@@ -347,16 +374,11 @@ namespace Winfred
 
                     this.sharpClipboard.ClipboardChanged += SharpClipboard_ClipboardChanged;
                 }
-                else if (m_CurrentString.Length >= 10)
+                else if (m_CurrentString.Length >= 15)
                 {
                     m_CurrentString = "";
                 }
             }
-        }
-
-        private void BackspaceTriggerCallBack(IAsyncResult asyncResult)
-        {
-            this.sharpClipboard.ClipboardChanged += SharpClipboard_ClipboardChanged;
         }
 
         private void ReplaceSourceByTarget(string source, string target)
@@ -469,49 +491,6 @@ namespace Winfred
             }
 
             e.Handled = true;
-        }
-
-        private void ResultsListBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
-        {
-            if (e.Key == Key.Enter)
-            {
-                try
-                {
-                    this.sharpClipboard.ClipboardChanged -= SharpClipboard_ClipboardChanged;
-
-                    ResultViewModel target = this.m_ClipboardResults.Results[this.ResultsListBox.SelectedIndex];
-
-                    if (target.MainTypeEnum == ResultTypeEnum.Text)
-                    {
-                        SetText2Clipboard(target.ResultPreview);
-                    }
-                    else if (target.MainTypeEnum == ResultTypeEnum.Image)
-                    {
-                        if (m_ClipboardImages.ContainsKey(target.HashCode))
-                        {
-                            DataObject dataObject = new DataObject(DataFormats.Bitmap, m_ClipboardImages[target.HashCode]);
-                            Clipboard.SetDataObject(dataObject, true);
-                        }
-                        else
-                        {
-                            Clipboard.Clear();
-                        }
-                    }
-
-                    Application.Current.MainWindow.Hide();
-
-                    var sim = new InputSimulator();
-                    sim.Keyboard.ModifiedKeyStroke(VirtualKeyCode.LCONTROL, VirtualKeyCode.VK_V);
-
-                    this.sharpClipboard.ClipboardChanged += SharpClipboard_ClipboardChanged;
-                }
-                catch (Exception exception)
-                {
-                    Console.WriteLine(exception.Message.ToString());
-                }
-
-                e.Handled = true;
-            }
         }
         #endregion
     }

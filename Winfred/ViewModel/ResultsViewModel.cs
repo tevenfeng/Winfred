@@ -14,18 +14,57 @@ namespace Winfred.ViewModel
         public ObservableCollection<ResultViewModel> Results
         {
             get { return _Results; }
-            set { _Results = value; FirePropertyChanged("Results"); }
+            set { _Results = value; FirePropertyChanged(nameof(Results)); }
+        }
+
+        private int _SelectedIndex;
+        public int SelectedIndex
+        {
+            get { return _SelectedIndex; }
+            set
+            {
+                _SelectedIndex = value;
+                FirePropertyChanged(nameof(SelectedIndex));
+            }
+        }
+
+        private ResultViewModel _SelectedResultViewModel;
+        public ResultViewModel SelectedResultViewModel
+        {
+            get { return _SelectedResultViewModel; }
+            set { _SelectedResultViewModel = value; FirePropertyChanged(nameof(SelectedResultViewModel)); }
         }
 
         public ResultsViewModel()
         {
-            _Results = new ObservableCollection< ResultViewModel>();
+            _Results = new ObservableCollection<ResultViewModel>();
+            _SelectedIndex = -1;
             _Results.CollectionChanged += _Results_CollectionChanged;
+        }
+
+        public int SelectNext()
+        {
+            SelectedIndex = (SelectedIndex + 1) % _Results.Count;
+
+            return SelectedIndex;
+        }
+
+        public int SelectPrevious()
+        {
+            if (SelectedIndex == 0)
+            {
+                SelectedIndex = _Results.Count - 1;
+            }
+            else
+            {
+                SelectedIndex--;
+            }
+            return SelectedIndex;
         }
 
         private void _Results_CollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
         {
-            FirePropertyChanged("Results");
+            FirePropertyChanged(nameof(Results));
         }
 
         public virtual event PropertyChangedEventHandler PropertyChanged;
@@ -50,7 +89,7 @@ namespace Winfred.ViewModel
             return false;
         }
 
-        public void clear()
+        public void Clear()
         {
             this.Results.Clear();
         }
