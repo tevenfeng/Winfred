@@ -306,11 +306,11 @@ namespace Winfred
 
         private void Winfred_Show()
         {
-            this.Activate();
             this.query_text.Clear();
             this.Visibility = Visibility.Visible;
+            this.Activate();
             this.query_text.Focus();
-            this.ResultsListBox.SelectedIndex = 0;
+            this.ResultsListBox.SelectedIndex = -1;
         }
 
         private void Winfred_Hide()
