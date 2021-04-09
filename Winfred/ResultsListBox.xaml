@@ -20,6 +20,8 @@
 
     <ListBox.ItemContainerStyle>
         <Style TargetType="ListBoxItem">
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
@@ -47,7 +49,7 @@
 
     <ListBox.ItemTemplate>
         <DataTemplate>
-            <TextBlock FontSize="22" Height="32" TextWrapping="NoWrap" Text="{Binding ResultName}"></TextBlock>
+            <TextBlock FontSize="22" Height="32" TextWrapping="NoWrap" Padding="0" Margin="0" Text="{Binding ResultName}"></TextBlock>
         </DataTemplate>
     </ListBox.ItemTemplate>
 </ListBox>

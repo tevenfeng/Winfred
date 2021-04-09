@@ -45,11 +45,14 @@
                 </ContentControl>
                 <RichTextBox x:Name="PreviewTextBlock" Grid.Column="1"
                          Height="384"
-                         FontSize="18"
+                         FontSize="16"
                          IsReadOnly="True"
                          BorderThickness="0"
                          Foreground="White"
                          Background="Black">
+                    <RichTextBox.Document>
+                        <FlowDocument LineHeight="1"></FlowDocument>
+                    </RichTextBox.Document>
                 </RichTextBox>
             </Grid>
         </StackPanel>

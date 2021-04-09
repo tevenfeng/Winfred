@@ -27,12 +27,14 @@ namespace Winfred
         /// <summary>
         /// global hook for key events
         /// </summary>
-        private IKeyboardMouseEvents m_GlobalHook;
+        private IKeyboardMouseEvents _GlobalHook;
+
+        private static InputSimulator _InputSimulator = new InputSimulator();
 
         /// <summary>
         /// Clipboard watcher
         /// </summary>
-        private SharpClipboard sharpClipboard = new SharpClipboard();
+        private SharpClipboard _SharpClipboard = new SharpClipboard();
 
         /// <summary>
         /// Delegation for backspacing and replacing texts
@@ -45,36 +47,32 @@ namespace Winfred
         /// <summary>
         /// Key combinations and actions list on watching
         /// </summary>
-        private Dictionary<Combination, Action> m_ActionList = new Dictionary<Combination, Action>();
+        private Dictionary<Combination, Action> _ActionList = new Dictionary<Combination, Action>();
 
         /// <summary>
         /// Configuration file
         /// </summary>
-        private string m_ConfigFilePath = "Winfred.ini";
+        private string _ConfigFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Winfred\\Winfred.ini");
         /// <summary>
         /// Snippets configuration directory
         /// </summary>
-        private string m_SnippetsDir = "";
+        private string _SnippetsDir = "";
 
         /// <summary>
         /// String watching on user's input
         /// </summary>
-        private string m_CurrentString = "";
+        private string _CurrentString = "";
 
-        private string m_TopTextInClipboard = "";
-
-        private BitmapSource m_TopBitmapSource;
+        private string _TopTextInClipboard = "";
 
         /// <summary>
         /// Key word snippets map
         /// </summary>
-        private ResultsViewModel m_SnippetsViewModel = new ResultsViewModel();
+        private ResultsViewModel _SnippetsViewModel = new ResultsViewModel();
 
-        private readonly ResultsViewModel m_ClipboardResults = new ResultsViewModel();
+        private readonly ResultsViewModel _ClipboardResults = new ResultsViewModel();
 
-        private Dictionary<int, BitmapSource> m_ClipboardImages = new Dictionary<int, BitmapSource>();
-
-        //private ObservableCollection<ResultViewModel> m_Results = new ObservableCollection<ResultViewModel>();
+        private Dictionary<int, BitmapSource> _ClipboardImages = new Dictionary<int, BitmapSource>();
 
         public MainWindow()
         {
@@ -84,9 +82,9 @@ namespace Winfred
             Subscribe();
             this.Visibility = Visibility.Hidden;
 
-            sharpClipboard.ClipboardChanged += SharpClipboard_ClipboardChanged;
+            _SharpClipboard.ClipboardChanged += SharpClipboard_ClipboardChanged;
 
-            this.m_ClipboardResults.PropertyChanged += M_ClipboardResults_PropertyChanged;
+            this._ClipboardResults.PropertyChanged += M_ClipboardResults_PropertyChanged;
             this.ResultsListBox.SelectionChanged += ResultsListBox_SelectionChanged;
         }
 
@@ -100,9 +98,10 @@ namespace Winfred
         #region 配置加载相关函数
         private void Load()
         {
-            m_ClipboardImages.Clear();
-            m_ClipboardResults.Clear();
-            m_SnippetsViewModel.Clear();
+            _CurrentString = "";
+            _ClipboardImages.Clear();
+            _ClipboardResults.Clear();
+            _SnippetsViewModel.Clear();
             LoadConfiguration();
             LoadSnippets();
         }
@@ -112,9 +111,9 @@ namespace Winfred
         /// </summary>
         private void LoadConfiguration()
         {
-            if (File.Exists(m_ConfigFilePath))
+            if (File.Exists(_ConfigFilePath))
             {
-                using (StreamReader sr = File.OpenText(m_ConfigFilePath))
+                using (StreamReader sr = File.OpenText(_ConfigFilePath))
                 {
                     string s;
                     while ((s = sr.ReadLine()) != null)
@@ -129,7 +128,7 @@ namespace Winfred
 
                         if (strSplitted[0] == "snippets")
                         {
-                            m_SnippetsDir = strSplitted[1];
+                            _SnippetsDir = strSplitted[1];
                         }
                     }
                 }
@@ -141,9 +140,9 @@ namespace Winfred
         /// </summary>
         private void LoadSnippets()
         {
-            if (Directory.Exists(m_SnippetsDir))
+            if (Directory.Exists(_SnippetsDir))
             {
-                var Dirs = Directory.EnumerateDirectories(m_SnippetsDir);
+                var Dirs = Directory.EnumerateDirectories(_SnippetsDir);
                 foreach (string currentDir in Dirs)
                 {
                     try
@@ -189,7 +188,7 @@ namespace Winfred
                                             }
                                         }
                                     }
-                                    m_SnippetsViewModel.Results.Add(new ResultViewModel(snippetName,
+                                    _SnippetsViewModel.Results.Add(new ResultViewModel(snippetName,
                                                                                         snippetText,
                                                                                         ResultTypeEnum.Text,
                                                                                         snippetName.GetHashCode()));
@@ -209,24 +208,24 @@ namespace Winfred
         #region 全局键鼠事件监听
         public void Subscribe()
         {
-            m_GlobalHook = Hook.GlobalEvents();
+            _GlobalHook = Hook.GlobalEvents();
 
-            m_GlobalHook.KeyPress += GlobalHookKeyPress;
+            _GlobalHook.KeyPress += GlobalHookKeyPress;
 
             // Display clipboard contents
             Combination clipboardCombination = Combination.TriggeredBy(Keys.Space).With(Keys.Alt).With(Keys.LControlKey);
             Action actionClipboard = DisplayClipboardContents;
-            m_ActionList.Add(clipboardCombination, actionClipboard);
+            _ActionList.Add(clipboardCombination, actionClipboard);
 
-            Hook.GlobalEvents().OnCombination(m_ActionList);
+            Hook.GlobalEvents().OnCombination(_ActionList);
 
             this.BackspaceTrigger += new NeedBackspace(ReplaceSourceByTarget);
         }
 
         public void Unsubscribe()
         {
-            m_GlobalHook.KeyPress -= GlobalHookKeyPress;
-            m_GlobalHook.Dispose();
+            _GlobalHook.KeyPress -= GlobalHookKeyPress;
+            _GlobalHook.Dispose();
         }
         #endregion
 
@@ -255,21 +254,21 @@ namespace Winfred
             }
             else if (e.Key == Key.Down)
             {
-                this.m_ClipboardResults.SelectNext();
+                this._ClipboardResults.SelectNext();
                 e.Handled = true;
             }
             else if (e.Key == Key.Up)
             {
-                this.m_ClipboardResults.SelectPrevious();
+                this._ClipboardResults.SelectPrevious();
                 e.Handled = true;
             }
             else if (e.Key == Key.Enter)
             {
                 try
                 {
-                    this.sharpClipboard.ClipboardChanged -= SharpClipboard_ClipboardChanged;
+                    this._SharpClipboard.ClipboardChanged -= SharpClipboard_ClipboardChanged;
 
-                    ResultViewModel target = this.m_ClipboardResults.SelectedResultViewModel;
+                    ResultViewModel target = this._ClipboardResults.SelectedResultViewModel;
 
                     if (target.MainTypeEnum == ResultTypeEnum.Text)
                     {
@@ -277,10 +276,11 @@ namespace Winfred
                     }
                     else if (target.MainTypeEnum == ResultTypeEnum.Image)
                     {
-                        if (m_ClipboardImages.ContainsKey(target.HashCode))
+                        if (_ClipboardImages.ContainsKey(target.HashCode))
                         {
-                            DataObject dataObject = new DataObject(DataFormats.Bitmap, m_ClipboardImages[target.HashCode]);
+                            DataObject dataObject = new DataObject(DataFormats.Bitmap, _ClipboardImages[target.HashCode]);
                             Clipboard.SetDataObject(dataObject, true);
+                            GC.Collect();
                         }
                         else
                         {
@@ -290,10 +290,9 @@ namespace Winfred
 
                     Application.Current.MainWindow.Hide();
 
-                    var sim = new InputSimulator();
-                    sim.Keyboard.ModifiedKeyStroke(VirtualKeyCode.LCONTROL, VirtualKeyCode.VK_V);
+                    _InputSimulator.Keyboard.ModifiedKeyStroke(VirtualKeyCode.LCONTROL, VirtualKeyCode.VK_V);
 
-                    this.sharpClipboard.ClipboardChanged += SharpClipboard_ClipboardChanged;
+                    this._SharpClipboard.ClipboardChanged += SharpClipboard_ClipboardChanged;
                 }
                 catch (Exception exception)
                 {
@@ -351,47 +350,47 @@ namespace Winfred
         {
             if (e.KeyChar == '$')
             {
-                m_CurrentString = "$";
+                _CurrentString = "$";
             }
             else if (e.KeyChar == '\b')
             {
-                if (m_CurrentString.Length > 0)
+                if (_CurrentString.Length > 0)
                 {
-                    m_CurrentString = m_CurrentString.Remove(m_CurrentString.Length - 1, 1);
+                    _CurrentString = _CurrentString.Remove(_CurrentString.Length - 1, 1);
                 }
             }
             else
             {
-                m_CurrentString += e.KeyChar.ToString();
-                bool IsSuccess = m_SnippetsViewModel.FindByResultName(m_CurrentString, out ResultViewModel targetSnippet);
+                _CurrentString += e.KeyChar.ToString();
+                bool IsSuccess = _SnippetsViewModel.FindByResultName(_CurrentString, out ResultViewModel targetSnippet);
                 if (IsSuccess)
                 {
-                    this.sharpClipboard.ClipboardChanged -= SharpClipboard_ClipboardChanged;
+                    this._SharpClipboard.ClipboardChanged -= SharpClipboard_ClipboardChanged;
 
-                    IAsyncResult result = BackspaceTrigger.BeginInvoke(m_CurrentString, targetSnippet.ResultPreview, null, null);
-                    BackspaceTrigger.EndInvoke(result);
-
-
-                    this.sharpClipboard.ClipboardChanged += SharpClipboard_ClipboardChanged;
+                    BackspaceTrigger.BeginInvoke(_CurrentString, targetSnippet.ResultPreview, BackspaceTriggerCallBack, null);
                 }
-                else if (m_CurrentString.Length >= 15)
+                else if (_CurrentString.Length >= 15)
                 {
-                    m_CurrentString = "";
+                    _CurrentString = "";
                 }
             }
+        }
+
+        private void BackspaceTriggerCallBack(IAsyncResult ar)
+        {
+            this._SharpClipboard.ClipboardChanged += SharpClipboard_ClipboardChanged;
         }
 
         private void ReplaceSourceByTarget(string source, string target)
         {
             int n = source.Length;
-            var sim = new InputSimulator();
             for (int i = 0; i < n; i++)
             {
-                sim.Keyboard.KeyPress(VirtualKeyCode.BACK);
+                _InputSimulator.Keyboard.KeyPress(VirtualKeyCode.BACK);
             }
             SetText2Clipboard(target);
 
-            sim.Keyboard.ModifiedKeyStroke(VirtualKeyCode.LCONTROL, VirtualKeyCode.VK_V);
+            _InputSimulator.Keyboard.ModifiedKeyStroke(VirtualKeyCode.LCONTROL, VirtualKeyCode.VK_V);
         }
 
         [STAThread]
@@ -401,6 +400,7 @@ namespace Winfred
             {
                 DataObject dataObject = new DataObject(DataFormats.Text, text);
                 Clipboard.SetDataObject(dataObject, true);
+                GC.Collect();
             }));
             th.TrySetApartmentState(ApartmentState.STA);
             th.Start();
@@ -418,45 +418,39 @@ namespace Winfred
         {
             if (e.ContentType == SharpClipboard.ContentTypes.Text)
             {
-                string tempString = sharpClipboard.ClipboardText;
-                if (tempString != m_TopTextInClipboard)
+                string tempString = _SharpClipboard.ClipboardText;
+                if (_ClipboardResults.FindByResultName(tempString, out ResultViewModel temp1))
                 {
-                    if (m_ClipboardResults.FindByResultName(tempString, out ResultViewModel temp1))
-                    {
-                        return;
-                    }
-
-                    this.m_TopTextInClipboard = tempString;
-
-                    m_ClipboardResults.Results.Insert(0,
-                                                new ResultViewModel(this.m_TopTextInClipboard,
-                                                                    this.m_TopTextInClipboard,
-                                                                    ResultTypeEnum.Text,
-                                                                    this.m_TopTextInClipboard.GetHashCode()));
-
                     return;
                 }
+
+                _ClipboardResults.Results.Insert(0,
+                                            new ResultViewModel(tempString,
+                                                                tempString,
+                                                                ResultTypeEnum.Text,
+                                                                tempString.GetHashCode()));
+
+                return;
             }
             else if (e.ContentType == SharpClipboard.ContentTypes.Image)
             {
                 BitmapSource tempBitMap = Clipboard.GetImage();
                 if (tempBitMap != null)
                 {
-                    m_TopBitmapSource = tempBitMap;
-                    string name = System.String.Format("Image {0}x{1}", m_TopBitmapSource.PixelWidth, m_TopBitmapSource.PixelHeight);
-                    m_ClipboardResults.Results.Insert(0,
+                    string name = System.String.Format("Image {0}x{1}", tempBitMap.PixelWidth, tempBitMap.PixelHeight);
+                    _ClipboardResults.Results.Insert(0,
                             new ResultViewModel(name,
-                                                this.m_TopBitmapSource.GetHashCode().ToString(),
+                                                "",
                                                 ResultTypeEnum.Image,
-                                                this.m_TopBitmapSource.GetHashCode()));
-                    m_ClipboardImages.Add(this.m_TopBitmapSource.GetHashCode(), m_TopBitmapSource);
+                                                tempBitMap.GetHashCode()));
+                    _ClipboardImages.Add(tempBitMap.GetHashCode(), tempBitMap);
                 }
             }
         }
 
         private void M_ClipboardResults_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
-            this.ResultsListBox.DataContext = this.m_ClipboardResults;
+            this.ResultsListBox.DataContext = this._ClipboardResults;
         }
 
         private void ResultsListBox_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
@@ -465,18 +459,18 @@ namespace Winfred
 
             try
             {
-                ResultViewModel target = this.m_ClipboardResults.Results[this.ResultsListBox.SelectedIndex];
+                ResultViewModel target = this._ClipboardResults.Results[this.ResultsListBox.SelectedIndex];
                 if (target.MainTypeEnum == ResultTypeEnum.Text)
                 {
                     this.PreviewTextBlock.AppendText(target.ResultPreview);
                 }
                 else if (target.MainTypeEnum == ResultTypeEnum.Image)
                 {
-                    if (m_ClipboardImages.ContainsKey(target.HashCode))
+                    if (_ClipboardImages.ContainsKey(target.HashCode))
                     {
                         Image image = new Image
                         {
-                            Source = m_ClipboardImages[target.HashCode]
+                            Source = _ClipboardImages[target.HashCode]
                         };
 
                         Paragraph paragraph = new Paragraph();
