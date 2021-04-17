@@ -63,8 +63,6 @@ namespace Winfred
         /// </summary>
         private string _CurrentString = "";
 
-        private string _TopTextInClipboard = "";
-
         /// <summary>
         /// Key word snippets map
         /// </summary>
@@ -388,6 +386,7 @@ namespace Winfred
             {
                 _InputSimulator.Keyboard.KeyPress(VirtualKeyCode.BACK);
             }
+            Thread.Sleep(10);
             SetText2Clipboard(target);
 
             _InputSimulator.Keyboard.ModifiedKeyStroke(VirtualKeyCode.LCONTROL, VirtualKeyCode.VK_V);
